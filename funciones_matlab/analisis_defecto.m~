@@ -1,0 +1,47 @@
+
+function [defect_struct] = analisis_defecto(data,time,RPM,malla)
+
+%% -------------------------------AJUSTE-----------------------
+tspan= .6*(time(end)-time(1));% fraccion de duracion de datos simulados
+ti=time(1)-tspan;
+tf=time(end)+tspan; %tiempos de decaimiento del defecto simulado
+
+for rpm=1:size(data,4)
+	tfin = 60/RPM(rpm); %tiempo de 1 vuelta
+	t(:,rpm) = [0 ti time tf tfin]; %padding para el defecto
+    tajuste(:,rpm)=linspace(0,tfin,malla);%tiempo del ajuste
+	Fs(rpm)= (malla-1)/tfin;
+	
+	for I=1:size(data,3)
+		for ycm=1:size(data,2)
+			signal= data(:,ycm,I,rpm)-mean(data(:,ycm,I,rpm)); 
+			padd = [0 0 signal' 0 0 ]'; % senhal con relleno
+			AJUSTE(:,ycm,I,rpm)=interp1(t(:,rpm),padd,tajuste(:,rpm),'cubic');
+		end
+	end
+end
+
+% Derivada temporal del flujo
+dt=tajuste(2,:)-tajuste(1,:);
+for rpm=1:size(AJUSTE,4)
+	DAJUSTE = diff(AJUSTE,1)/dt(rpm);
+end
+
+%-------------------------------ESPECTRO-----------------------
+for ycm=1:size(data,2)
+	for I=1:size(data,3)
+		for rpm=1:size(data,4)
+			[aux ,fre(:,rpm)] = mifft(AJUSTE(:,ycm,I,rpm),Fs(rpm));
+			[aux2 ,f_int(:,rpm)] = mifft(DAJUSTE(:,ycm,I,rpm),Fs(rpm));
+			AJUSTE_fft(:,ycm,I,rpm) = aux;
+			DAJUSTE_fft(:,ycm,I,rpm) = aux2;
+		end
+	end
+end
+
+defect_struct.ajuste_senal = AJUSTE;
+defect_struct.ajuste_derivada = DAJUSTE;
+defect_struct.ajuste_senal_fft= AJUSTE_fft;
+defect_struct.ajuste_derivada_fft= DAJUSTE_fft;
+defect_struct.frecuencias = frecuentias;
+end

@@ -1,0 +1,52 @@
+function [flujo_defect,dphi_defect,fft_defect,frecuencias_defect] = flujo_defecto(defect_type,filename_2,espira,YCM_COST,RPM,corrientes) 
+disp('|같같같같같같같같같같같같같같같같같같같같같같같같같같같같같같|')
+disp('|같같같같같같같같같같�   FLUJO_DEFECTO  같같같같같같같같같같�|')
+disp('|같같같같같같같같같같같같같같같같같같같같같같같같같같같같같같|')
+
+adress =['D:\Compartido\mariano\02_Flujo_magnetico\datos\amalog2d_v3_' defect_type '_OD_244mm_WT_14mm_gap_10mm\'];
+load(filename_2)
+
+for i=1:length(corrientes)
+	for j=1:length(RPM)
+		tic
+		filename = [ adress 'amalog2d_v3_' defect_type '_OD_244mm_WT_14mm_gap_10mm_' num2str(RPM(j)) 'rpm_I_' num2str(corrientes(i)) 'mA.mat'];
+		load(filename)
+		[THETA RHO] = meshgrid(angulos+(pi/2),radios);
+		
+		%coordenadas de los bordes de la espira
+		for k=1:length(YCM_COST)
+			r1= [(espira.xcm - espira.lx) , YCM_COST(k)];
+			r2= [(espira.xcm + espira.lx) , YCM_COST(k)];
+			[theta_1 rho_1] = cart2pol(r1(1), r1(2));
+			[theta_2 rho_2] = cart2pol(r2(1), r2(2));
+			
+			
+			for t=1:length(tlist)
+				aux1= interp2(THETA,RHO,Az(:,:,t),theta_1,rho_1);
+				aux2= interp2(THETA,RHO,Az(:,:,t),theta_2,rho_2);
+				flujo_defect(t,k,i,j) = espira.lz*(aux2 - aux1);% phi = lz(A_z(xy_2)-A_z(xy_1))
+			end
+		end
+		toc
+		
+	end
+end
+
+dt=tlist(2)-tlist(1);
+time=tlist+dt/2;
+dphi_defect = diff(flujo_defect,1,1)/dt;
+
+
+Fs=5938.2;
+RPM = [ 50 100 150 200 250];
+wr= RPM/60;
+
+for I=1:size(dphi_defect,3) % Analisis espectral del defecto
+	for rpm=1:size(dphi_defect,4)
+		for k=1:length(YCM_COST)
+			data=dphi_defect(:,k,I,rpm);
+			[fft_defect(:,k,I,rpm) frecuencias_defect] = mifft(data,Fs);
+		end
+	end
+end
+end
